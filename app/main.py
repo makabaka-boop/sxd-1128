@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
+import traceback
 
 from app.config import settings
 from app.database import engine, Base, SessionLocal
@@ -77,6 +79,17 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Uncaught exception: {exc}")
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "traceback": traceback.format_exc()}
+    )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -86,6 +99,17 @@ app.add_middleware(
 )
 
 api_router = FastAPI(title="API v1")
+
+
+@api_router.exception_handler(Exception)
+async def api_exception_handler(request: Request, exc: Exception):
+    logger.error(f"API Uncaught exception: {exc}")
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "traceback": traceback.format_exc()}
+    )
+
 
 api_router.include_router(auth.router, prefix="/auth", tags=["认证"])
 api_router.include_router(users.router, prefix="/users", tags=["用户管理"])

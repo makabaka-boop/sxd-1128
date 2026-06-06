@@ -19,6 +19,8 @@ def get_exception_reports(
     status: Optional[ExceptionStatus] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    inspection_item_id: Optional[int] = None,
+    has_inspection_record: Optional[bool] = None,
 ) -> List[ExceptionReport]:
     query = db.query(ExceptionReport)
     
@@ -32,14 +34,23 @@ def get_exception_reports(
         query = query.filter(ExceptionReport.report_time >= datetime.combine(start_date, datetime.min.time()))
     if end_date:
         query = query.filter(ExceptionReport.report_time <= datetime.combine(end_date, datetime.max.time()))
+    if inspection_item_id:
+        query = query.join(ExceptionReport.inspection_record).filter(
+            ExceptionReport.inspection_record.has(inspection_item_id=inspection_item_id)
+        )
+    if has_inspection_record is True:
+        query = query.filter(ExceptionReport.inspection_record_id.isnot(None))
+    elif has_inspection_record is False:
+        query = query.filter(ExceptionReport.inspection_record_id.is_(None))
     
     return query.order_by(ExceptionReport.report_time.desc()).offset(skip).limit(limit).all()
 
 
-def create_exception_report(db: Session, report_in: ExceptionReportCreate, reporter_id: int) -> ExceptionReport:
+def create_exception_report(db: Session, report_in: ExceptionReportCreate, reporter_id: int, inspection_record_id: Optional[int] = None) -> ExceptionReport:
     db_report = ExceptionReport(
         **report_in.model_dump(),
         reporter_id=reporter_id,
+        inspection_record_id=inspection_record_id,
     )
     db.add(db_report)
     db.commit()

@@ -20,3 +20,4 @@ class InspectionRecord(Base):
     pen = relationship("Pen")
     inspector = relationship("User")
     inspection_item = relationship("InspectionItem")
+    exception_reports = relationship("ExceptionReport", back_populates="inspection_record")

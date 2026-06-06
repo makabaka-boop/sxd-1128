@@ -10,6 +10,7 @@ from app.crud.inspection_record import get_inspection_records, get_inspection_re
 from app.crud.pen import get_pen
 from app.crud.inspection_item import get_inspection_item
 from app.schemas.inspection_record import InspectionRecord as InspectionRecordSchema, InspectionRecordCreate, InspectionRecordResponse
+from app.schemas.exception_report import ExceptionReport as ExceptionReportSchema
 
 router = APIRouter()
 
@@ -64,7 +65,7 @@ def get_inspection_record_by_id(
     return record_dict
 
 
-@router.post("/", response_model=InspectionRecordSchema, status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED)
 def create_new_inspection_record(
     record_in: InspectionRecordCreate,
     db: Session = Depends(get_db),
@@ -82,8 +83,15 @@ def create_new_inspection_record(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Inspection item not found"
         )
-    record = create_inspection_record(db, record_in, inspector_id=current_user.id)
-    return record
+    record, exception_report = create_inspection_record(db, record_in, inspector_id=current_user.id)
+    
+    result = {
+        "record": record.__dict__
+    }
+    if exception_report:
+        result["exception_report"] = exception_report.__dict__
+    
+    return result
 
 
 @router.delete("/{record_id}", status_code=status.HTTP_204_NO_CONTENT)

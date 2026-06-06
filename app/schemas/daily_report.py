@@ -3,6 +3,21 @@ from typing import Optional, List
 from datetime import date, datetime
 
 
+class AbnormalInspectionItem(BaseModel):
+    inspection_item_id: int
+    inspection_item_name: str
+    abnormal_count: int
+    pending_count: int
+
+
+class PenInspectionStats(BaseModel):
+    pen_id: int
+    pen_name: str
+    abnormal_inspection_count: int
+    pending_abnormal_count: int
+    abnormal_items: List[AbnormalInspectionItem]
+
+
 class DailyReportBase(BaseModel):
     report_date: date
     pen_id: int
@@ -23,6 +38,9 @@ class DailyReportResponse(DailyReportBase):
     pen_name: Optional[str] = None
     exception_rate: Optional[float] = None
     inspection_pass_rate: Optional[float] = None
+    abnormal_inspection_count: Optional[int] = None
+    pending_abnormal_count: Optional[int] = None
+    abnormal_items: Optional[List[AbnormalInspectionItem]] = None
 
     class Config:
         from_attributes = True

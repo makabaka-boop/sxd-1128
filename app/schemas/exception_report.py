@@ -27,6 +27,7 @@ class ExceptionReportResponse(ExceptionReportBase):
     id: int
     reporter_id: int
     handler_id: Optional[int] = None
+    inspection_record_id: Optional[int] = None
     status: ExceptionStatus
     resolve_time: Optional[datetime] = None
     resolution: Optional[str] = None
@@ -36,6 +37,9 @@ class ExceptionReportResponse(ExceptionReportBase):
     reporter_name: Optional[str] = None
     handler_name: Optional[str] = None
     processing_hours: Optional[float] = None
+    inspection_item_name: Optional[str] = None
+    inspection_record_time: Optional[datetime] = None
+    inspection_remark: Optional[str] = None
 
     class Config:
         from_attributes = True

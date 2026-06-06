@@ -1,11 +1,12 @@
 from sqlalchemy.orm import Session
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 from datetime import date, datetime, timedelta
 from sqlalchemy import func, and_, or_
 
 from app.models.daily_report import DailyReport
 from app.models.feeding_record import FeedingRecord
 from app.models.inspection_record import InspectionRecord
+from app.models.inspection_item import InspectionItem
 from app.models.exception_report import ExceptionReport, ExceptionStatus
 from app.models.pen import Pen
 
@@ -121,6 +122,65 @@ def calculate_daily_stats(db: Session, report_date: date, pen_id: int) -> dict:
         "avg_processing_hours": avg_processing_hours,
         "unfinished_items": unfinished_items,
     }
+
+
+def get_abnormal_inspection_stats(db: Session, report_date: date, pen_id: int) -> dict:
+    start_dt = datetime.combine(report_date, datetime.min.time())
+    end_dt = datetime.combine(report_date, datetime.max.time())
+    
+    abnormal_records = db.query(InspectionRecord).filter(
+        InspectionRecord.pen_id == pen_id,
+        InspectionRecord.result == False,
+        InspectionRecord.inspection_time >= start_dt,
+        InspectionRecord.inspection_time <= end_dt
+    ).all()
+    
+    abnormal_inspection_count = len(abnormal_records)
+    
+    pending_abnormal_count = 0
+    item_stats: Dict[int, dict] = {}
+    
+    for record in abnormal_records:
+        item_id = record.inspection_item_id
+        if item_id not in item_stats:
+            item = db.query(InspectionItem).filter(InspectionItem.id == item_id).first()
+            item_stats[item_id] = {
+                "inspection_item_id": item_id,
+                "inspection_item_name": item.name if item else "未知",
+                "abnormal_count": 0,
+                "pending_count": 0
+            }
+        item_stats[item_id]["abnormal_count"] += 1
+        
+        has_pending_exception = db.query(ExceptionReport).filter(
+            ExceptionReport.inspection_record_id == record.id,
+            ExceptionReport.status != ExceptionStatus.RESOLVED
+        ).first() is not None
+        
+        if has_pending_exception:
+            item_stats[item_id]["pending_count"] += 1
+            pending_abnormal_count += 1
+    
+    abnormal_items = sorted(item_stats.values(), key=lambda x: x["abnormal_count"], reverse=True)
+    
+    return {
+        "abnormal_inspection_count": abnormal_inspection_count,
+        "pending_abnormal_count": pending_abnormal_count,
+        "abnormal_items": abnormal_items
+    }
+
+
+def get_all_pens_abnormal_stats(db: Session, report_date: date) -> List[dict]:
+    pens = db.query(Pen).all()
+    result = []
+    for pen in pens:
+        stats = get_abnormal_inspection_stats(db, report_date, pen.id)
+        result.append({
+            "pen_id": pen.id,
+            "pen_name": pen.name,
+            **stats
+        })
+    return result
 
 
 def generate_daily_report(db: Session, report_date: date, pen_id: int, allow_overwrite_history: bool = False) -> DailyReport:

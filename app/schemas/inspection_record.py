@@ -11,8 +11,14 @@ class InspectionRecordBase(BaseModel):
     inspection_time: datetime
 
 
+class InspectionExceptionData(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    severity: str = Field(default="normal")
+    description: str = Field(..., min_length=1)
+
+
 class InspectionRecordCreate(InspectionRecordBase):
-    pass
+    exception_data: Optional[InspectionExceptionData] = None
 
 
 class InspectionRecordResponse(InspectionRecordBase):

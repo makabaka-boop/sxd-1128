@@ -24,13 +24,17 @@ def list_exception_reports(
     status: Optional[ExceptionStatus] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    inspection_item_id: Optional[int] = None,
+    has_inspection_record: Optional[bool] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_business_data)
 ):
     reports = get_exception_reports(
         db, skip=skip, limit=limit, pen_id=pen_id,
         reporter_id=reporter_id, status=status,
-        start_date=start_date, end_date=end_date
+        start_date=start_date, end_date=end_date,
+        inspection_item_id=inspection_item_id,
+        has_inspection_record=has_inspection_record
     )
     result = []
     for report in reports:
@@ -44,6 +48,11 @@ def list_exception_reports(
         if report.report_time and report.resolve_time:
             delta = report.resolve_time - report.report_time
             report_dict["processing_hours"] = round(delta.total_seconds() / 3600, 2)
+        if report.inspection_record:
+            if report.inspection_record.inspection_item:
+                report_dict["inspection_item_name"] = report.inspection_record.inspection_item.name
+            report_dict["inspection_record_time"] = report.inspection_record.inspection_time
+            report_dict["inspection_remark"] = report.inspection_record.remark
         result.append(report_dict)
     return result
 
@@ -70,6 +79,11 @@ def get_exception_report_by_id(
     if report.report_time and report.resolve_time:
         delta = report.resolve_time - report.report_time
         report_dict["processing_hours"] = round(delta.total_seconds() / 3600, 2)
+    if report.inspection_record:
+        if report.inspection_record.inspection_item:
+            report_dict["inspection_item_name"] = report.inspection_record.inspection_item.name
+        report_dict["inspection_record_time"] = report.inspection_record.inspection_time
+        report_dict["inspection_remark"] = report.inspection_record.remark
     return report_dict
 
 

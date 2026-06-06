@@ -5,7 +5,7 @@ from typing import List
 from app.database import get_db
 from app.api.deps import require_admin, require_business_data
 from app.models.user import User
-from app.crud.pen import get_pens, get_pen, create_pen, update_pen, delete_pen
+from app.crud.pen import get_pens, get_pen, get_pen_by_name, create_pen, update_pen, delete_pen
 from app.schemas.pen import Pen as PenSchema, PenCreate, PenUpdate
 
 router = APIRouter()
@@ -43,7 +43,6 @@ def create_new_pen(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin)
 ):
-    from app.crud.pen import get_pen_by_name
     existing_pen = get_pen_by_name(db, pen_in.name)
     if existing_pen:
         raise HTTPException(
