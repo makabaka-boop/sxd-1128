@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import date
 
 from app.database import get_db
-from app.api.deps import require_field_worker, require_observer
+from app.api.deps import require_field_worker, require_business_data
 from app.models.user import User
 from app.crud.feeding_record import get_feeding_records, get_feeding_record, create_feeding_record, delete_feeding_record
 from app.crud.pen import get_pen
@@ -22,7 +22,7 @@ def list_feeding_records(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_business_data)
 ):
     records = get_feeding_records(
         db, skip=skip, limit=limit, pen_id=pen_id,
@@ -43,7 +43,7 @@ def list_feeding_records(
 def get_feeding_record_by_id(
     record_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_business_data)
 ):
     record = get_feeding_record(db, record_id)
     if not record:

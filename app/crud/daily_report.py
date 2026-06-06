@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional, Tuple
 from datetime import date, datetime, timedelta
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 
 from app.models.daily_report import DailyReport
 from app.models.feeding_record import FeedingRecord
@@ -78,20 +78,21 @@ def calculate_daily_stats(db: Session, report_date: date, pen_id: int) -> dict:
     
     exception_resolved_count = db.query(func.count(ExceptionReport.id)).filter(
         ExceptionReport.pen_id == pen_id,
-        ExceptionReport.status == ExceptionStatus.RESOLVED,
         ExceptionReport.resolve_time >= start_dt,
         ExceptionReport.resolve_time <= end_dt
     ).scalar() or 0
     
     exception_pending_count = db.query(func.count(ExceptionReport.id)).filter(
         ExceptionReport.pen_id == pen_id,
-        ExceptionReport.status.in_([ExceptionStatus.PENDING, ExceptionStatus.PROCESSING]),
-        ExceptionReport.report_time <= end_dt
+        ExceptionReport.report_time <= end_dt,
+        or_(
+            ExceptionReport.resolve_time.is_(None),
+            ExceptionReport.resolve_time > end_dt
+        )
     ).scalar() or 0
     
     resolved_exceptions = db.query(ExceptionReport).filter(
         ExceptionReport.pen_id == pen_id,
-        ExceptionReport.status == ExceptionStatus.RESOLVED,
         ExceptionReport.resolve_time >= start_dt,
         ExceptionReport.resolve_time <= end_dt
     ).all()
@@ -122,8 +123,12 @@ def calculate_daily_stats(db: Session, report_date: date, pen_id: int) -> dict:
     }
 
 
-def generate_daily_report(db: Session, report_date: date, pen_id: int) -> DailyReport:
+def generate_daily_report(db: Session, report_date: date, pen_id: int, allow_overwrite_history: bool = False) -> DailyReport:
     existing = get_daily_report_by_date_and_pen(db, report_date, pen_id)
+    
+    if existing and not allow_overwrite_history and report_date < date.today():
+        return existing
+    
     stats = calculate_daily_stats(db, report_date, pen_id)
     
     if existing:
@@ -158,63 +163,101 @@ def calculate_change_rate(current: float, previous: float) -> Optional[float]:
     return round(((current - previous) / previous) * 100, 2)
 
 
+def get_date_range(report_date: date, comparison_type: str) -> Tuple[date, date, date, date]:
+    if comparison_type == "day":
+        curr_start = report_date
+        curr_end = report_date
+        prev_start = report_date - timedelta(days=1)
+        prev_end = report_date - timedelta(days=1)
+    elif comparison_type == "week":
+        weekday = report_date.weekday()
+        curr_start = report_date - timedelta(days=weekday)
+        curr_end = report_date
+        duration_days = (curr_end - curr_start).days
+        prev_end = curr_start - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=duration_days)
+    elif comparison_type == "month":
+        curr_start = report_date.replace(day=1)
+        curr_end = report_date
+        if curr_start.month == 1:
+            prev_month_start = curr_start.replace(year=curr_start.year - 1, month=12)
+        else:
+            prev_month_start = curr_start.replace(month=curr_start.month - 1)
+        duration_days = (curr_end - curr_start).days
+        prev_start = prev_month_start
+        prev_end = prev_start + timedelta(days=duration_days)
+        import calendar
+        last_day_prev = calendar.monthrange(prev_start.year, prev_start.month)[1]
+        if prev_end.day > last_day_prev:
+            prev_end = prev_end.replace(day=last_day_prev)
+    else:
+        curr_start = report_date
+        curr_end = report_date
+        prev_start = report_date - timedelta(days=1)
+        prev_end = report_date - timedelta(days=1)
+    
+    return curr_start, curr_end, prev_start, prev_end
+
+
+def aggregate_reports_in_range(db: Session, start_date: date, end_date: date, pen_id: Optional[int] = None) -> dict:
+    query = db.query(DailyReport).filter(
+        DailyReport.report_date >= start_date,
+        DailyReport.report_date <= end_date
+    )
+    if pen_id:
+        query = query.filter(DailyReport.pen_id == pen_id)
+    reports = query.all()
+    
+    if not reports:
+        return {
+            "feeding_count": 0,
+            "exception_count": 0,
+            "exception_rate": 0,
+            "avg_processing_hours": 0,
+            "inspection_pass_rate": 0,
+            "unfinished_items": 0,
+        }
+    
+    total_feeding = sum(r.feeding_count for r in reports)
+    total_exception = sum(r.exception_count for r in reports)
+    total_inspection = sum(r.inspection_count for r in reports)
+    total_unfinished = sum(r.unfinished_items for r in reports)
+    total_pass = sum(r.inspection_pass_count for r in reports)
+    
+    processing_hours_list = [r.avg_processing_hours for r in reports if r.avg_processing_hours is not None]
+    avg_processing = round(sum(processing_hours_list) / len(processing_hours_list), 2) if processing_hours_list else 0
+    
+    exception_rate = round((total_exception / total_inspection * 100), 2) if total_inspection > 0 else 0
+    pass_rate = round((total_pass / total_inspection * 100), 2) if total_inspection > 0 else 0
+    
+    return {
+        "feeding_count": total_feeding,
+        "exception_count": total_exception,
+        "exception_rate": exception_rate,
+        "avg_processing_hours": avg_processing,
+        "inspection_pass_rate": pass_rate,
+        "unfinished_items": total_unfinished,
+    }
+
+
 def get_report_comparison(
     db: Session,
     report_date: date,
     pen_id: Optional[int] = None,
     comparison_type: str = "day"
 ) -> dict:
-    if comparison_type == "day":
-        prev_date = report_date - timedelta(days=1)
-    elif comparison_type == "week":
-        prev_date = report_date - timedelta(weeks=1)
-    elif comparison_type == "month":
-        prev_date = report_date - timedelta(days=30)
-    else:
-        prev_date = report_date - timedelta(days=1)
+    curr_start, curr_end, prev_start, prev_end = get_date_range(report_date, comparison_type)
     
-    def aggregate_reports(target_date: date) -> dict:
-        query = db.query(DailyReport).filter(DailyReport.report_date == target_date)
-        if pen_id:
-            query = query.filter(DailyReport.pen_id == pen_id)
-        reports = query.all()
-        
-        if not reports:
-            return {
-                "feeding_count": 0,
-                "exception_count": 0,
-                "exception_rate": 0,
-                "avg_processing_hours": 0,
-                "inspection_pass_rate": 0,
-                "unfinished_items": 0,
-            }
-        
-        total_feeding = sum(r.feeding_count for r in reports)
-        total_exception = sum(r.exception_count for r in reports)
-        total_inspection = sum(r.inspection_count for r in reports)
-        total_unfinished = sum(r.unfinished_items for r in reports)
-        
-        processing_hours_list = [r.avg_processing_hours for r in reports if r.avg_processing_hours is not None]
-        avg_processing = round(sum(processing_hours_list) / len(processing_hours_list), 2) if processing_hours_list else 0
-        
-        exception_rate = round((total_exception / total_inspection * 100), 2) if total_inspection > 0 else 0
-        pass_rate = round((sum(r.inspection_pass_count for r in reports) / total_inspection * 100), 2) if total_inspection > 0 else 0
-        
-        return {
-            "feeding_count": total_feeding,
-            "exception_count": total_exception,
-            "exception_rate": exception_rate,
-            "avg_processing_hours": avg_processing,
-            "inspection_pass_rate": pass_rate,
-            "unfinished_items": total_unfinished,
-        }
-    
-    current = aggregate_reports(report_date)
-    previous = aggregate_reports(prev_date)
+    current = aggregate_reports_in_range(db, curr_start, curr_end, pen_id)
+    previous = aggregate_reports_in_range(db, prev_start, prev_end, pen_id)
     
     result = {
         "report_date": report_date,
         "pen_id": pen_id,
+        "current_period_start": curr_start,
+        "current_period_end": curr_end,
+        "previous_period_start": prev_start,
+        "previous_period_end": prev_end,
     }
     
     for key in ["feeding_count", "exception_count", "exception_rate", "avg_processing_hours", "inspection_pass_rate", "unfinished_items"]:

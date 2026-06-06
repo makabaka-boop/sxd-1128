@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import date
 
 from app.database import get_db
-from app.api.deps import require_field_worker, require_observer, get_current_user
+from app.api.deps import require_field_worker, require_business_data, get_current_user
 from app.models.user import User
 from app.crud.inspection_record import get_inspection_records, get_inspection_record, create_inspection_record, delete_inspection_record
 from app.crud.pen import get_pen
@@ -23,7 +23,7 @@ def list_inspection_records(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_business_data)
 ):
     records = get_inspection_records(
         db, skip=skip, limit=limit, pen_id=pen_id,
@@ -46,7 +46,7 @@ def list_inspection_records(
 def get_inspection_record_by_id(
     record_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_business_data)
 ):
     record = get_inspection_record(db, record_id)
     if not record:

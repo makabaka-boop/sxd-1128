@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import date
 
 from app.database import get_db
-from app.api.deps import require_field_worker, require_observer, get_current_user
+from app.api.deps import require_field_worker, require_business_data, get_current_user
 from app.models.user import User
 from app.models.exception_report import ExceptionStatus
 from app.crud.exception_report import get_exception_reports, get_exception_report, create_exception_report, update_exception_report, delete_exception_report
@@ -25,7 +25,7 @@ def list_exception_reports(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_business_data)
 ):
     reports = get_exception_reports(
         db, skip=skip, limit=limit, pen_id=pen_id,
@@ -52,7 +52,7 @@ def list_exception_reports(
 def get_exception_report_by_id(
     report_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_business_data)
 ):
     report = get_exception_report(db, report_id)
     if not report:

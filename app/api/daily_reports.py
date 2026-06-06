@@ -7,7 +7,7 @@ import io
 import pandas as pd
 
 from app.database import get_db
-from app.api.deps import require_admin, require_observer
+from app.api.deps import require_admin, require_report_viewer
 from app.models.user import User
 from app.crud.daily_report import (
     get_daily_reports,
@@ -29,7 +29,7 @@ def list_daily_reports(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_report_viewer)
 ):
     reports = get_daily_reports(
         db, skip=skip, limit=limit, pen_id=pen_id,
@@ -54,7 +54,7 @@ def list_daily_reports(
 def get_daily_report_by_id(
     report_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_report_viewer)
 ):
     report = get_daily_report(db, report_id)
     if not report:
@@ -90,7 +90,7 @@ def get_comparison(
     report_date: Optional[date] = None,
     pen_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_report_viewer)
 ):
     if report_date is None:
         report_date = date.today()
@@ -118,7 +118,7 @@ def export_reports_excel(
     end_date: Optional[date] = None,
     pen_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_report_viewer)
 ):
     reports = get_daily_reports(
         db, skip=0, limit=10000, pen_id=pen_id,

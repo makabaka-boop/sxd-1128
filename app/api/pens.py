@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
-from app.api.deps import require_admin, require_observer
+from app.api.deps import require_admin, require_business_data
 from app.models.user import User
 from app.crud.pen import get_pens, get_pen, create_pen, update_pen, delete_pen
 from app.schemas.pen import Pen as PenSchema, PenCreate, PenUpdate
@@ -16,7 +16,7 @@ def list_pens(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_business_data)
 ):
     pens = get_pens(db, skip=skip, limit=limit)
     return pens
@@ -26,7 +26,7 @@ def list_pens(
 def get_pen_by_id(
     pen_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_business_data)
 ):
     pen = get_pen(db, pen_id)
     if not pen:

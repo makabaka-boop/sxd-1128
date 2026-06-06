@@ -38,6 +38,10 @@ class ReportComparison(BaseModel):
     report_date: date
     pen_id: Optional[int] = None
     pen_name: Optional[str] = None
+    current_period_start: Optional[date] = None
+    current_period_end: Optional[date] = None
+    previous_period_start: Optional[date] = None
+    previous_period_end: Optional[date] = None
     
     feeding_count: Optional[ComparisonData] = None
     exception_count: Optional[ComparisonData] = None

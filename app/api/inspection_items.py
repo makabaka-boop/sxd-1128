@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app.database import get_db
-from app.api.deps import require_admin, require_observer
+from app.api.deps import require_admin, require_business_data
 from app.models.user import User
 from app.crud.inspection_item import get_inspection_items, get_inspection_item, create_inspection_item, update_inspection_item, delete_inspection_item
 from app.schemas.inspection_item import InspectionItem as InspectionItemSchema, InspectionItemCreate, InspectionItemUpdate
@@ -17,7 +17,7 @@ def list_inspection_items(
     limit: int = 100,
     is_active: Optional[bool] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_business_data)
 ):
     items = get_inspection_items(db, skip=skip, limit=limit, is_active=is_active)
     return items
@@ -27,7 +27,7 @@ def list_inspection_items(
 def get_inspection_item_by_id(
     item_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_observer)
+    current_user: User = Depends(require_business_data)
 ):
     item = get_inspection_item(db, item_id)
     if not item:

@@ -50,4 +50,5 @@ def require_roles(allowed_roles: List[UserRole]):
 
 require_admin = require_roles([UserRole.ADMIN])
 require_field_worker = require_roles([UserRole.ADMIN, UserRole.FIELD_WORKER])
-require_observer = require_roles([UserRole.ADMIN, UserRole.FIELD_WORKER, UserRole.OBSERVER])
+require_report_viewer = require_roles([UserRole.ADMIN, UserRole.FIELD_WORKER, UserRole.OBSERVER])
+require_business_data = require_roles([UserRole.ADMIN, UserRole.FIELD_WORKER])
