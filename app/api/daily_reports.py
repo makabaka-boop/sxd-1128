@@ -16,6 +16,7 @@ from app.crud.daily_report import (
     get_report_comparison,
     get_abnormal_inspection_stats,
     get_all_pens_abnormal_stats,
+    calculate_daily_stats,
 )
 from app.crud.pen import get_pen
 from app.schemas.daily_report import DailyReport as DailyReportSchema, DailyReportResponse, ReportComparison, PenInspectionStats
@@ -31,6 +32,7 @@ def list_daily_reports(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     include_abnormal_stats: bool = False,
+    use_live_stats: bool = True,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_report_viewer)
 ):
@@ -43,9 +45,14 @@ def list_daily_reports(
         report_dict = report.__dict__.copy()
         if report.pen:
             report_dict["pen_name"] = report.pen.name
-        if report.inspection_count > 0:
-            report_dict["exception_rate"] = round((report.exception_count / report.inspection_count) * 100, 2)
-            report_dict["inspection_pass_rate"] = round((report.inspection_pass_count / report.inspection_count) * 100, 2)
+        
+        if use_live_stats:
+            live_stats = calculate_daily_stats(db, report.report_date, report.pen_id)
+            report_dict.update(live_stats)
+        
+        if report_dict["inspection_count"] > 0:
+            report_dict["exception_rate"] = round((report_dict["exception_count"] / report_dict["inspection_count"]) * 100, 2)
+            report_dict["inspection_pass_rate"] = round((report_dict["inspection_pass_count"] / report_dict["inspection_count"]) * 100, 2)
         else:
             report_dict["exception_rate"] = None
             report_dict["inspection_pass_rate"] = None
@@ -166,6 +173,7 @@ def export_reports_excel(
 def get_daily_report_by_id(
     report_id: int,
     include_abnormal_stats: bool = True,
+    use_live_stats: bool = True,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_report_viewer)
 ):
@@ -178,9 +186,14 @@ def get_daily_report_by_id(
     report_dict = report.__dict__.copy()
     if report.pen:
         report_dict["pen_name"] = report.pen.name
-    if report.inspection_count > 0:
-        report_dict["exception_rate"] = round((report.exception_count / report.inspection_count) * 100, 2)
-        report_dict["inspection_pass_rate"] = round((report.inspection_pass_count / report.inspection_count) * 100, 2)
+    
+    if use_live_stats:
+        live_stats = calculate_daily_stats(db, report.report_date, report.pen_id)
+        report_dict.update(live_stats)
+    
+    if report_dict["inspection_count"] > 0:
+        report_dict["exception_rate"] = round((report_dict["exception_count"] / report_dict["inspection_count"]) * 100, 2)
+        report_dict["inspection_pass_rate"] = round((report_dict["inspection_pass_count"] / report_dict["inspection_count"]) * 100, 2)
     else:
         report_dict["exception_rate"] = None
         report_dict["inspection_pass_rate"] = None

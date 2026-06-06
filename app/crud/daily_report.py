@@ -86,10 +86,7 @@ def calculate_daily_stats(db: Session, report_date: date, pen_id: int) -> dict:
     exception_pending_count = db.query(func.count(ExceptionReport.id)).filter(
         ExceptionReport.pen_id == pen_id,
         ExceptionReport.report_time <= end_dt,
-        or_(
-            ExceptionReport.resolve_time.is_(None),
-            ExceptionReport.resolve_time > end_dt
-        )
+        ExceptionReport.status != ExceptionStatus.RESOLVED
     ).scalar() or 0
     
     resolved_exceptions = db.query(ExceptionReport).filter(

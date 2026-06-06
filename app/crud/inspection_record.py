@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional, Tuple
 from datetime import date, datetime
+from fastapi import HTTPException, status
 
 from app.models.inspection_record import InspectionRecord
 from app.models.exception_report import ExceptionReport
@@ -35,6 +36,18 @@ def get_inspection_records(
 
 
 def create_inspection_record(db: Session, record_in: InspectionRecordCreate, inspector_id: int) -> Tuple[InspectionRecord, Optional[ExceptionReport]]:
+    if not record_in.result and record_in.exception_data is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="巡检结果为异常时，必须填写异常信息"
+        )
+    
+    if record_in.result and record_in.exception_data is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="巡检结果为正常时，不能填写异常信息"
+        )
+    
     record_data = record_in.model_dump(exclude={"exception_data"})
     db_record = InspectionRecord(
         **record_data,
